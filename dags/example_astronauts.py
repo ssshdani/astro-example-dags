@@ -26,6 +26,7 @@ from pendulum import datetime
 import requests
 import json
 from pathlib import Path
+from datetime import datetime as dt
 
 
 # Define the basic parameters of the DAG
@@ -60,7 +61,7 @@ def example_astronauts():
         context["ti"].xcom_push(
             key="number_of_people_in_space", value=number_of_people_in_space
         )
-        context["ti"].xcom_push(key="timestamp", value=datetime.now().isoformat())
+        context["ti"].xcom_push(key="timestamp", value=dt.now().isoformat())
         context["ti"].xcom_push(key="message", value=data.get("message", "success"))
 
         # Return the list directly for dynamic task mapping
@@ -213,7 +214,6 @@ def example_astronauts():
             str: Path to the created CSV file
         """
         import pandas as pd
-        from datetime import datetime as dt
 
         # Create DataFrame from astronaut list
         df = pd.DataFrame(astronaut_data["astronauts"])
@@ -247,7 +247,6 @@ def example_astronauts():
         Returns:
             str: Path to the created JSON file
         """
-        from datetime import datetime as dt
 
         # Combine all data
         combined_data = {
@@ -287,7 +286,6 @@ def example_astronauts():
             csv_file: Path to exported CSV file
             json_file: Path to exported JSON file
         """
-        from datetime import datetime as dt
 
         print("\n")
         print("╔" + "=" * 68 + "╗")
