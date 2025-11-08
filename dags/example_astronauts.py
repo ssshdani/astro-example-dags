@@ -371,7 +371,9 @@ def example_astronauts():
     )
 
     # Step 3: Get metadata dictionary (for export and reporting tasks)
+    # Note: Must depend on astronaut_list to ensure get_astronauts() completes first
     astronaut_data = get_astronaut_metadata()
+    astronaut_list >> astronaut_data  # Explicit dependency to ensure XCom data exists
 
     # Step 4: Get ISS location
     iss_location = get_iss_location()
