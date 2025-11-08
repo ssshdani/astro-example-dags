@@ -43,12 +43,12 @@ def example_astronauts():
     """
 
     @task(outlets=[Dataset("current_astronauts")])
-    def get_astronauts(**context) -> dict:
+    def get_astronauts(**context) -> list:
         """
         Fetches the list of astronauts currently in space from Open Notify API.
 
         Returns:
-            dict: Contains astronaut list, total count, and timestamp
+            list: List of astronaut dictionaries (name, craft)
         """
         r = requests.get("http://api.open-notify.org/astros.json")
         data = r.json()
@@ -56,17 +56,34 @@ def example_astronauts():
         number_of_people_in_space = data["number"]
         list_of_people_in_space = data["people"]
 
-        # Push count to XCom for other tasks
+        # Push metadata to XCom for other tasks
         context["ti"].xcom_push(
             key="number_of_people_in_space", value=number_of_people_in_space
         )
+        context["ti"].xcom_push(key="timestamp", value=datetime.now().isoformat())
+        context["ti"].xcom_push(key="message", value=data.get("message", "success"))
 
-        # Return enhanced data structure
+        # Return the list directly for dynamic task mapping
+        return list_of_people_in_space
+
+    @task
+    def get_astronaut_metadata(**context) -> dict:
+        """
+        Retrieves astronaut metadata from XCom and packages it with the list.
+
+        Returns:
+            dict: Contains astronaut list, total count, timestamp, and message
+        """
+        ti = context["ti"]
+        astronaut_list = ti.xcom_pull(task_ids="get_astronauts")
+
         return {
-            "astronauts": list_of_people_in_space,
-            "total_count": number_of_people_in_space,
-            "timestamp": datetime.now().isoformat(),
-            "message": data.get("message", "success"),
+            "astronauts": astronaut_list,
+            "total_count": ti.xcom_pull(
+                task_ids="get_astronauts", key="number_of_people_in_space"
+            ),
+            "timestamp": ti.xcom_pull(task_ids="get_astronauts", key="timestamp"),
+            "message": ti.xcom_pull(task_ids="get_astronauts", key="message"),
         }
 
     @task
@@ -345,28 +362,31 @@ def example_astronauts():
     # TASK ORCHESTRATION - Define the workflow
     # ========================================================================
 
-    # Step 1: Fetch astronaut data
-    astronaut_data = get_astronauts()
+    # Step 1: Fetch astronaut list (returns list directly for mapping)
+    astronaut_list = get_astronauts()
 
     # Step 2: Print each astronaut (dynamic task mapping)
     print_astronaut_craft.partial(greeting="Hello from Earth! 🌍").expand(
-        person_in_space=astronaut_data["astronauts"]
+        person_in_space=astronaut_list
     )
 
-    # Step 3: Get ISS location
+    # Step 3: Get metadata dictionary (for export and reporting tasks)
+    astronaut_data = get_astronaut_metadata()
+
+    # Step 4: Get ISS location
     iss_location = get_iss_location()
 
-    # Step 4: Get weather/location details for ISS position
+    # Step 5: Get weather/location details for ISS position
     weather_data = get_weather_at_iss_location(iss_location)
 
-    # Step 5: Display ISS information
+    # Step 6: Display ISS information
     print_iss_location(iss_location, weather_data)
 
-    # Step 6: Export data to files
+    # Step 7: Export data to files
     csv_file = export_astronaut_data_to_csv(astronaut_data)
     json_file = export_iss_data_to_json(iss_location, weather_data)
 
-    # Step 7: Generate comprehensive summary report
+    # Step 8: Generate comprehensive summary report
     generate_summary_report(
         astronaut_data, iss_location, weather_data, csv_file, json_file
     )
