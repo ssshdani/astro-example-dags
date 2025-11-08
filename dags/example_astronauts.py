@@ -128,7 +128,7 @@ def example_astronauts():
             "latitude_formatted": f"{abs(lat):.4f}°{lat_direction}",
             "longitude_formatted": f"{abs(lon):.4f}°{lon_direction}",
             "timestamp": timestamp,
-            "timestamp_readable": datetime.fromtimestamp(timestamp).isoformat(),
+            "timestamp_readable": dt.fromtimestamp(timestamp).isoformat(),
             "map_url": f"https://www.google.com/maps?q={lat},{lon}",
         }
 
