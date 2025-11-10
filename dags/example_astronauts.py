@@ -2,17 +2,17 @@
 ## Enhanced Astronaut & Space Data Pipeline
 
 This DAG creates a comprehensive space data pipeline that:
-1. Fetches real-time astronaut data from Open Notify API
+1. Fetches real-time astronaut data from Open Notify API (names, spacecraft)
 2. Retrieves current ISS location (latitude/longitude)
-3. Gets weather data for the ISS location
+3. Calculates ISS orbital information (speed, altitude, orbit period)
 4. Exports all data to CSV and JSON files
-5. Generates a beautiful formatted summary report
+5. Generates a detailed summary report with individual astronaut listings
 
 This pipeline demonstrates:
-- Multiple API integrations (Open Notify, OpenWeatherMap)
+- Multiple API integrations (Open Notify API)
 - Dynamic task mapping for parallel processing
 - Data transformation and export
-- Professional report generation
+- Professional report generation with grouped data
 - Real-world ETL (Extract, Transform, Load) patterns
 
 Perfect for understanding modern data pipeline orchestration!
@@ -133,59 +133,39 @@ def example_astronauts():
         }
 
     @task
-    def get_weather_at_iss_location(location: dict) -> dict:
+    def get_iss_orbital_info(location: dict) -> dict:
         """
-        Fetches weather data for the ISS location using OpenWeatherMap API.
+        Provides ISS orbital and flight information.
 
-        Note: This uses the free tier API. For production, add your API key.
-        Falls back to generic ocean data if API call fails.
+        The ISS orbits at ~400km altitude, well above Earth's atmosphere and weather patterns.
+        This task returns relevant orbital data rather than weather information.
 
         Args:
             location: Dictionary containing ISS coordinates
 
         Returns:
-            dict: Weather information or fallback data
+            dict: ISS orbital and flight information
         """
-        try:
-            # Using OpenWeatherMap free tier (no API key needed for basic data)
-            # Note: For production, sign up at https://openweathermap.org/api and add API key
-            location["latitude"]
-            location["longitude"]
+        # ISS orbital data (these are relatively constant)
+        orbital_info = {
+            "altitude": "408 km (254 miles) above Earth",
+            "orbital_speed": "~28,000 km/h (17,500 mph)",
+            "orbit_period": "~90 minutes per orbit",
+            "orbits_per_day": "~16 orbits",
+            "current_position": f"Lat: {location['latitude_formatted']}, Lon: {location['longitude_formatted']}",
+            "note": "ISS orbits above Earth's atmosphere and weather patterns",
+        }
 
-            # For demo purposes, we'll create a simulated response
-            # In production, uncomment below and add your API key:
-            # api_key = "YOUR_API_KEY"
-            # url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}"
-            # r = requests.get(url)
-            # weather_data = r.json()
-
-            # Simulated weather data for demonstration
-            weather_data = {
-                "location": "Over Ocean/Remote Area",
-                "description": "ISS is currently over a remote area (likely ocean)",
-                "note": "ISS orbits at ~400km altitude, above weather patterns",
-                "altitude": "408 km (254 miles)",
-                "speed": "~28,000 km/h (17,500 mph)",
-                "orbit_period": "~90 minutes per orbit",
-            }
-
-            return weather_data
-
-        except Exception as e:
-            return {
-                "error": str(e),
-                "note": "Weather data unavailable",
-                "location": "Unknown",
-            }
+        return orbital_info
 
     @task
-    def print_iss_location(location: dict, weather: dict) -> None:
+    def print_iss_location(location: dict, orbital_info: dict) -> None:
         """
-        Displays formatted ISS location and weather information.
+        Displays formatted ISS location and orbital information.
 
         Args:
             location: ISS coordinate data
-            weather: Weather information for ISS location
+            orbital_info: ISS orbital and flight information
         """
         print("\n" + "=" * 60)
         print("🛰️  INTERNATIONAL SPACE STATION - CURRENT STATUS")
@@ -196,8 +176,8 @@ def example_astronauts():
         print(f"   Timestamp: {location['timestamp_readable']}")
         print(f"   Map View:  {location['map_url']}")
 
-        print("\n🌦️  LOCATION DETAILS:")
-        for key, value in weather.items():
+        print("\n🚀 ORBITAL INFORMATION:")
+        for key, value in orbital_info.items():
             print(f"   {key.replace('_', ' ').title()}: {value}")
 
         print("\n" + "=" * 60 + "\n")
@@ -236,13 +216,13 @@ def example_astronauts():
         return filename
 
     @task
-    def export_iss_data_to_json(location: dict, weather: dict) -> str:
+    def export_iss_data_to_json(location: dict, orbital_info: dict) -> str:
         """
-        Exports ISS location and weather data to a JSON file.
+        Exports ISS location and orbital data to a JSON file.
 
         Args:
             location: ISS coordinate data
-            weather: Weather information
+            orbital_info: ISS orbital information
 
         Returns:
             str: Path to the created JSON file
@@ -251,7 +231,7 @@ def example_astronauts():
         # Combine all data
         combined_data = {
             "iss_location": location,
-            "weather_info": weather,
+            "orbital_info": orbital_info,
             "export_timestamp": dt.now().isoformat(),
         }
 
@@ -272,7 +252,7 @@ def example_astronauts():
     def generate_summary_report(
         astronaut_data: dict,
         location: dict,
-        weather: dict,
+        orbital_info: dict,
         csv_file: str,
         json_file: str,
     ) -> None:
@@ -282,7 +262,7 @@ def example_astronauts():
         Args:
             astronaut_data: Astronaut information
             location: ISS location data
-            weather: Weather information
+            orbital_info: ISS orbital information
             csv_file: Path to exported CSV file
             json_file: Path to exported JSON file
         """
@@ -335,13 +315,13 @@ def example_astronauts():
         print(f"   Timestamp:    {location['timestamp_readable']}")
         print(f"   Map Link:     {location['map_url']}")
 
-        # Weather/Location Info
+        # ISS Orbital Information
         print("\n" + "─" * 70)
-        print("🌍 LOCATION DETAILS")
+        print("🚀 ISS ORBITAL INFORMATION")
         print("─" * 70)
-        for key, value in weather.items():
+        for key, value in orbital_info.items():
             key_formatted = key.replace("_", " ").title()
-            print(f"   {key_formatted:20} {value}")
+            print(f"   {key_formatted:25} {value}")
 
         # Export Files Summary
         print("\n" + "─" * 70)
@@ -357,7 +337,7 @@ def example_astronauts():
         checks = [
             ("Astronaut data retrieved", astronaut_data["total_count"] > 0),
             ("ISS location valid", location["latitude"] and location["longitude"]),
-            ("Weather data available", "location" in weather or "note" in weather),
+            ("ISS orbital info available", "altitude" in orbital_info),
             ("CSV export successful", csv_file.endswith(".csv")),
             ("JSON export successful", json_file.endswith(".json")),
         ]
@@ -390,19 +370,19 @@ def example_astronauts():
     # Step 4: Get ISS location
     iss_location = get_iss_location()
 
-    # Step 5: Get weather/location details for ISS position
-    weather_data = get_weather_at_iss_location(iss_location)
+    # Step 5: Get ISS orbital information
+    orbital_info = get_iss_orbital_info(iss_location)
 
     # Step 6: Display ISS information
-    print_iss_location(iss_location, weather_data)
+    print_iss_location(iss_location, orbital_info)
 
     # Step 7: Export data to files
     csv_file = export_astronaut_data_to_csv(astronaut_data)
-    json_file = export_iss_data_to_json(iss_location, weather_data)
+    json_file = export_iss_data_to_json(iss_location, orbital_info)
 
     # Step 8: Generate comprehensive summary report
     generate_summary_report(
-        astronaut_data, iss_location, weather_data, csv_file, json_file
+        astronaut_data, iss_location, orbital_info, csv_file, json_file
     )
 
 
