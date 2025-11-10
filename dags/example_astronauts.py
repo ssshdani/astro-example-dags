@@ -51,21 +51,37 @@ def example_astronauts():
         Returns:
             list: List of astronaut dictionaries (name, craft)
         """
-        r = requests.get("http://api.open-notify.org/astros.json")
-        data = r.json()
+        from airflow.exceptions import AirflowException
 
-        number_of_people_in_space = data["number"]
-        list_of_people_in_space = data["people"]
+        try:
+            # Add timeout: (connect timeout, read timeout)
+            r = requests.get("http://api.open-notify.org/astros.json", timeout=(5, 10))
+            r.raise_for_status()
+            data = r.json()
 
-        # Push metadata to XCom for other tasks
-        context["ti"].xcom_push(
-            key="number_of_people_in_space", value=number_of_people_in_space
-        )
-        context["ti"].xcom_push(key="timestamp", value=dt.now().isoformat())
-        context["ti"].xcom_push(key="message", value=data.get("message", "success"))
+            # Validate response structure
+            if "number" not in data or "people" not in data:
+                raise AirflowException(f"Invalid API response structure: {data}")
 
-        # Return the list directly for dynamic task mapping
-        return list_of_people_in_space
+            number_of_people_in_space = data["number"]
+            list_of_people_in_space = data["people"]
+
+            # Push metadata to XCom for other tasks
+            context["ti"].xcom_push(
+                key="number_of_people_in_space", value=number_of_people_in_space
+            )
+            context["ti"].xcom_push(key="timestamp", value=dt.now().isoformat())
+            context["ti"].xcom_push(key="message", value=data.get("message", "success"))
+
+            # Return the list directly for dynamic task mapping
+            return list_of_people_in_space
+
+        except requests.exceptions.Timeout:
+            raise AirflowException("Astronaut API request timed out after 10 seconds")
+        except requests.exceptions.RequestException as e:
+            raise AirflowException(f"Failed to fetch astronaut data: {str(e)}")
+        except (KeyError, ValueError, TypeError) as e:
+            raise AirflowException(f"Error parsing astronaut data: {str(e)}")
 
     @task
     def get_astronaut_metadata(**context) -> dict:
@@ -108,29 +124,53 @@ def example_astronauts():
         Returns:
             dict: ISS latitude, longitude, timestamp, and additional metadata
         """
-        r = requests.get("http://api.open-notify.org/iss-now.json")
-        data = r.json()
+        from airflow.exceptions import AirflowException
 
-        iss_position = data["iss_position"]
-        timestamp = data["timestamp"]
+        try:
+            # Add timeout: (connect timeout, read timeout)
+            r = requests.get("http://api.open-notify.org/iss-now.json", timeout=(5, 10))
+            r.raise_for_status()  # Raise exception for 4xx/5xx status codes
+            data = r.json()
 
-        # Convert to human-readable format
-        lat = float(iss_position["latitude"])
-        lon = float(iss_position["longitude"])
+            # Validate response structure
+            if "iss_position" not in data or "timestamp" not in data:
+                raise AirflowException(f"Invalid API response structure: {data}")
 
-        # Determine hemisphere
-        lat_direction = "N" if lat >= 0 else "S"
-        lon_direction = "E" if lon >= 0 else "W"
+            iss_position = data["iss_position"]
+            timestamp = data["timestamp"]
 
-        return {
-            "latitude": iss_position["latitude"],
-            "longitude": iss_position["longitude"],
-            "latitude_formatted": f"{abs(lat):.4f}°{lat_direction}",
-            "longitude_formatted": f"{abs(lon):.4f}°{lon_direction}",
-            "timestamp": timestamp,
-            "timestamp_readable": dt.fromtimestamp(timestamp).isoformat(),
-            "map_url": f"https://www.google.com/maps?q={lat},{lon}",
-        }
+            # Validate position data
+            if "latitude" not in iss_position or "longitude" not in iss_position:
+                raise AirflowException(
+                    f"Missing position data in response: {iss_position}"
+                )
+
+            # Convert to human-readable format
+            lat = float(iss_position["latitude"])
+            lon = float(iss_position["longitude"])
+
+            # Determine hemisphere
+            lat_direction = "N" if lat >= 0 else "S"
+            lon_direction = "E" if lon >= 0 else "W"
+
+            return {
+                "latitude": iss_position["latitude"],
+                "longitude": iss_position["longitude"],
+                "latitude_formatted": f"{abs(lat):.4f}°{lat_direction}",
+                "longitude_formatted": f"{abs(lon):.4f}°{lon_direction}",
+                "timestamp": timestamp,
+                "timestamp_readable": dt.fromtimestamp(timestamp).isoformat(),
+                "map_url": f"https://www.google.com/maps?q={lat},{lon}",
+            }
+
+        except requests.exceptions.Timeout:
+            raise AirflowException(
+                "ISS location API request timed out after 10 seconds"
+            )
+        except requests.exceptions.RequestException as e:
+            raise AirflowException(f"Failed to fetch ISS location: {str(e)}")
+        except (KeyError, ValueError, TypeError) as e:
+            raise AirflowException(f"Error parsing ISS location data: {str(e)}")
 
     @task
     def get_iss_orbital_info(location: dict) -> dict:
