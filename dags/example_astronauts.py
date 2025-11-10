@@ -300,16 +300,30 @@ def example_astronauts():
         print("─" * 70)
         print(f"   Total Astronauts: {astronaut_data['total_count']}")
         print(f"   Data Status:      {astronaut_data['message']}")
-        print("\n   Breakdown by Spacecraft:")
 
-        # Count astronauts by craft
-        craft_counts = {}
+        # Group astronauts by spacecraft
+        craft_groups = {}
         for astronaut in astronaut_data["astronauts"]:
             craft = astronaut["craft"]
-            craft_counts[craft] = craft_counts.get(craft, 0) + 1
+            if craft not in craft_groups:
+                craft_groups[craft] = []
+            craft_groups[craft].append(astronaut["name"])
 
-        for craft, count in craft_counts.items():
-            print(f"      • {craft}: {count} astronaut(s)")
+        print("\n   Breakdown by Spacecraft:")
+        for craft, astronauts in craft_groups.items():
+            print(
+                f"\n      🚀 {craft} ({len(astronauts)} astronaut{'s' if len(astronauts) > 1 else ''}):"
+            )
+            for name in sorted(astronauts):
+                print(f"         • {name}")
+
+        # Additional statistics
+        print("\n   Statistics:")
+        avg_crew_size = (
+            astronaut_data["total_count"] / len(craft_groups) if craft_groups else 0
+        )
+        print(f"      • Total spacecraft: {len(craft_groups)}")
+        print(f"      • Average crew size: {avg_crew_size:.1f} astronauts per craft")
 
         # ISS Location Summary
         print("\n" + "─" * 70)
